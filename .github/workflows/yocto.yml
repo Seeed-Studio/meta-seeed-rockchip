@@ -1,0 +1,106 @@
+name: Yocto image
+
+on:
+  workflow_dispatch:
+    inputs:
+      machine:
+        description: Board to build
+        required: true
+        type: choice
+        options:
+          - all
+          - recomputer-rk3576-devkit
+          - recomputer-rk3588-devkit
+        default: all
+      yocto_version:
+        description: Yocto release series
+        required: true
+        type: choice
+        options:
+          - wrynose
+        default: wrynose
+
+concurrency:
+  group: yocto-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.machine }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.machine != 'all') && format('["{0}"]', inputs.machine) || '["recomputer-rk3576-devkit", "recomputer-rk3588-devkit"]') }}
+
+    steps:
+      - name: Checkout layer
+        uses: actions/checkout@v4
+
+      - name: Install Yocto host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc build-essential chrpath cpio diffstat file gawk git \
+            iputils-ping libacl1 libegl1 lz4 libsdl2-dev \
+            mesa-common-dev pylint python3 python3-git python3-jinja2 \
+            python3-pexpect python3-subunit socat texinfo unzip \
+            wget xterm xz-utils zstd
+
+      - name: Enable BitBake user namespaces
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Fetch Yocto layers
+        run: |
+          YOCTO_VERSION='${{ inputs.yocto_version }}'
+          test "$YOCTO_VERSION" = wrynose
+          checkout_revision() {
+            directory="$1"
+            repository="$2"
+            revision="$3"
+            git init -q "$directory"
+            git -C "$directory" remote add origin "$repository"
+            git -C "$directory" fetch --depth 1 origin "$revision"
+            git -C "$directory" checkout --detach -q FETCH_HEAD
+          }
+          checkout_revision poky https://git.openembedded.org/openembedded-core.git \
+            ef022bf82d79015802309d14c28b13373ebe53f5
+          checkout_revision bitbake https://git.openembedded.org/bitbake.git \
+            0ad6c1c34a5e07a5f8dd66ab248c1e7b37b69fa9
+          checkout_revision meta-yocto https://git.yoctoproject.org/meta-yocto.git \
+            1b132647002eea43a2c7a7f857f63f42dacbc26c
+          checkout_revision meta-openembedded https://github.com/openembedded/meta-openembedded.git \
+            6bf0d8ad57b33950bab4c7f6c037e1ccb6f6e2eb
+          checkout_revision meta-rockchip https://github.com/JeffyCN/meta-rockchip.git \
+            b2393c23f16e6230025499015610d8c0018b1ea7
+
+      - name: Parse image metadata
+        run: |
+          ROOT_DIR="$PWD"
+          export POKY_DIR="$PWD/poky"
+          source poky/oe-init-build-env build-parse-${{ inputs.yocto_version }}-${{ matrix.machine }} >/dev/null
+          bitbake-layers add-layer "$ROOT_DIR/meta-yocto/meta-poky"
+          bitbake-layers add-layer "$ROOT_DIR/meta-openembedded/meta-oe"
+          bitbake-layers add-layer "$ROOT_DIR/meta-rockchip"
+          bitbake-layers add-layer "$ROOT_DIR"
+          printf 'MACHINE = "%s"\nDISTRO = "poky"\n' \
+            '${{ matrix.machine }}' >> conf/local.conf
+          bitbake -p seeed-rockchip-image
+
+      - name: Build image
+        run: |
+          export POKY_DIR="$PWD/poky"
+          ./scripts/build-yocto-image.sh \
+            '${{ matrix.machine }}' \
+            seeed-rockchip-image \
+            build-${{ inputs.yocto_version }}-${{ matrix.machine }}
+
+      - name: Upload deploy artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: yocto-${{ matrix.machine }}
+          path: build-${{ inputs.yocto_version }}-${{ matrix.machine }}/tmp/deploy/images/${{ matrix.machine }}/
+          if-no-files-found: error
+          retention-days: 14
