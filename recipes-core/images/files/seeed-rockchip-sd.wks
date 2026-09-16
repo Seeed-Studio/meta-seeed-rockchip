@@ -21,5 +21,6 @@ part --source rawcopy --sourceparams="file=u-boot.itb" --offset 8M --no-table
 
 # Rootfs (partition 1: the loader stages are --no-table).  The UUID is
 # referenced verbatim by UBOOT_EXTLINUX_ROOT in recomputer-common.inc.
-part / --source rootfs --fstype=ext4 --label root --active \
-    --uuid 9b5e7774-4756-44bf-9553-f44de2fcef27 --align 16384
+# NOTE: wic's kickstart parser shlex-splits each line independently -
+# no backslash continuations, keep every command on a single line.
+part / --source rootfs --fstype=ext4 --label root --active --uuid 9b5e7774-4756-44bf-9553-f44de2fcef27 --align 16384

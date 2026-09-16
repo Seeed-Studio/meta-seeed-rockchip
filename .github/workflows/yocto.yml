@@ -114,6 +114,14 @@ jobs:
             '${{ matrix.machine }}' >> conf/local.conf
           bitbake -p seeed-rockchip-image
 
+      - name: Restore Yocto sstate cache
+        uses: actions/cache@v4
+        with:
+          path: build-${{ inputs.yocto_version }}-${{ matrix.machine }}/sstate-cache
+          key: yocto-${{ inputs.yocto_version }}-${{ matrix.machine }}-sstate-${{ github.sha }}
+          restore-keys: |
+            yocto-${{ inputs.yocto_version }}-${{ matrix.machine }}-sstate-
+
       - name: Build image
         run: |
           export POKY_DIR="$PWD/poky"
