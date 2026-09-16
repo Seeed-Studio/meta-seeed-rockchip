@@ -26,3 +26,11 @@ IMAGE_LINGUAS = ""
 # partitioning or OTA layout. Consumers can add their own image features and
 # packages through local.conf or a product layer.
 IMAGE_ROOTFS_SIZE ?= "8192"
+
+# Flashable GPT disk image: Rockchip boot chain (idbloader at sector 64,
+# U-Boot FIT at 8 MiB) plus the rootfs partition; U-Boot then distro-boots
+# the kernel via /boot/extlinux/extlinux.conf from the rootfs, so no
+# separate boot partition is needed.
+IMAGE_FSTYPES:append = " wic wic.bmap"
+WKS_FILE = "${THISDIR}/files/seeed-rockchip-sd.wks"
+WKS_FILE_DEPENDS += "u-boot"

@@ -1,0 +1,25 @@
+# Copyright (C) 2026 Seeed Studio
+# Released under the MIT license (see COPYING.MIT for the terms)
+#
+# long-description: GPT SD/eMMC disk image for the Seeed reComputer
+# Rockchip boards with the mainline-style Rockchip boot chain: idbloader
+# at sector 64 (32 KiB) and the U-Boot FIT at sector 16384 (8 MiB) - the
+# same layout as the layer's rkspi_loader.img and the balena
+# integration.  U-Boot's distro boot then loads the kernel via
+# /boot/extlinux/extlinux.conf from the rootfs partition, so no separate
+# boot partition is needed.
+
+bootloader --ptable gpt
+
+# Boot-ROM stage: SPL-with-DDR-blob idbloader (deployed unversioned by
+# the layer's u-boot recipe).
+part --source rawcopy --sourceparams="file=idbloader.img" --align 32 --no-table
+
+# U-Boot proper: FIT image with BL31/TEE.  The 8 MiB gap up to the rootfs
+# partition leaves ample room for the FIT and its future growth.
+part --source rawcopy --sourceparams="file=u-boot.itb" --offset 8M --no-table
+
+# Rootfs (partition 1: the loader stages are --no-table).  The UUID is
+# referenced verbatim by UBOOT_EXTLINUX_ROOT in recomputer-common.inc.
+part / --source rootfs --fstype=ext4 --label root --active \
+    --uuid 9b5e7774-4756-44bf-9553-f44de2fcef27 --align 16384

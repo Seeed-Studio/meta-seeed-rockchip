@@ -118,3 +118,13 @@ do_kernel_metadata:prepend() {
 do_kernel_configme:prepend() {
     mkdir -p ${S}/.kernel-meta ${S}/.kernel-meta/cfg
 }
+
+# The uboot-extlinux-config class (pulled in via KERNEL_CLASSES in the
+# machine conf) only generates ${B}/extlinux.conf; install it into the
+# rootfs /boot where U-Boot's distro boot expects it.  The kernel package
+# owns /boot, so claim the extlinux directory explicitly.
+do_install:append() {
+    install -d ${D}/boot/extlinux
+    install -m 0644 ${B}/extlinux.conf ${D}/boot/extlinux/extlinux.conf
+}
+FILES:${KERNEL_PACKAGE_NAME} += "/boot/extlinux"
