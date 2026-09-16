@@ -33,4 +33,7 @@ IMAGE_ROOTFS_SIZE ?= "8192"
 # separate boot partition is needed.
 IMAGE_FSTYPES:append = " wic wic.bmap"
 WKS_FILE = "${THISDIR}/files/seeed-rockchip-sd.wks"
-WKS_FILE_DEPENDS += "u-boot"
+# rawcopy loaders from the u-boot deploy plus the ext4 rootfs partition:
+# u-boot deploys idbloader.img/u-boot.itb, e2fsprogs-native provides the
+# mkfs.ext4 wic needs (this environment's wic-tools does not stage it).
+WKS_FILE_DEPENDS += "u-boot e2fsprogs-native"
