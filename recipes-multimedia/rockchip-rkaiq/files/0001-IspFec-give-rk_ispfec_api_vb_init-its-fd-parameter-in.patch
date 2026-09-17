@@ -1,0 +1,31 @@
+From: balena-seeed-rockchip integration
+Subject: [PATCH] IspFec: give rk_ispfec_api_vb_init its fd parameter in the header
+
+src/rk_ispfec_videobuf.c defines rk_ispfec_api_vb_init(int fd) but
+rk_ispfec_videobuf.h declares it with an empty parameter list; GCC 14
+rejects the conflicting types.  Declare the parameter the definition
+already takes (the other three vb APIs in the same header already
+carry their fd parameter).
+
+Upstream-Status: Submitted [needed by any GCC>=14 build of the rkaiq-2025_08_11 tree]
+Signed-off-by: qian
+---
+ IspFec/include/rk_ispfec_videobuf.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/IspFec/include/rk_ispfec_videobuf.h b/IspFec/include/rk_ispfec_videobuf.h
+--- a/IspFec/include/rk_ispfec_videobuf.h
++++ b/IspFec/include/rk_ispfec_videobuf.h
+@@ -14,7 +14,7 @@ struct rkfec_buffer {
+     uint64_t size;
+     void* map;
+ };
+
+-int rk_ispfec_api_vb_init();
++int rk_ispfec_api_vb_init(int fd);
+ void rk_ispfec_api_vb_deinit(int fd);
+ int rk_ispfec_api_vb_alloc(int fd, uint32_t size, struct rkfec_buffer* buf);
+ int rk_ispfec_api_vb_free(int fd, struct rkfec_buffer* buf);
+--
+2.34.1
+

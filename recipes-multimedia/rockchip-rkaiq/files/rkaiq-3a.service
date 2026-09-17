@@ -1,0 +1,19 @@
+[Unit]
+Description=Rockchip RKAIQ camera 3A server
+Documentation=https://github.com/Panzhifeng-seeed/seeed_armbian_extension
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rkaiq_3A_server
+# Media graph nodes may not be settled yet at unit start; retry until
+# udev has created the /dev/media* devices.  Restart=always (not
+# on-failure): the guarded wrapper exits cleanly (status 0) when no
+# sensor is attached, and only an unconditional restart re-launches it
+# once the camera is connected; a deliberate "systemctl stop" is never
+# restarted by systemd.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
