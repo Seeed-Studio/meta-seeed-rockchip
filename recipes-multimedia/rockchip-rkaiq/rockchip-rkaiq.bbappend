@@ -85,12 +85,26 @@ do_install:append() {
     install -m 0644 ${UNPACKDIR}/rkaiq-3a.service \
         ${D}${systemd_system_unitdir}/
 
-    # Board sensor calibrations (the DTS declares imx708@1a and
-    # imx219@10 on both camera connectors) - the v6.0x8.0 tree ships
-    # neither.  Drop additional sensors into files/iqfiles/ as the DTS
-    # grows support for them.
-    install -m 0644 ${UNPACKDIR}/iqfiles/*.json \
-        ${D}${sysconfdir}/iqfiles/
+    # Board sensor calibrations.  The scene key is per ISP generation -
+    # isp3x (RK3588) reads scene_isp30, isp39 (RK3576) scene_isp39 - so
+    # pick the matching file; a wrong-generation profile fails the scene
+    # lookup and SEGVs the closed library right after engine init.  All
+    # three files are byte-identical to Seeed's copies in
+    # seeed_armbian_extension deb_source (iqfiles/isp39/* added by
+    # 1d4c68a, iqfiles/isp3x/* by b2063d7, both newer than this recipe's
+    # pinned SRCREV, which is why the layer installs them itself).
+    if [ "${RK_SOC_FAMILY}" = "rk3576" ]; then
+        install -m 0644 \
+            ${UNPACKDIR}/iqfiles/imx708_rpi-camera-v3_default-isp39.json \
+            ${D}${sysconfdir}/iqfiles/imx708_rpi-camera-v3_default.json
+        install -m 0644 \
+            ${UNPACKDIR}/iqfiles/imx219_rpi-camera-v2_default-isp39.json \
+            ${D}${sysconfdir}/iqfiles/imx219_rpi-camera-v2_default.json
+    else
+        install -m 0644 \
+            ${UNPACKDIR}/iqfiles/imx708_rpi-camera-v3_default-isp3x.json \
+            ${D}${sysconfdir}/iqfiles/imx708_rpi-camera-v3_default.json
+    fi
 }
 
 inherit systemd

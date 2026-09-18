@@ -1,6 +1,5 @@
 [Unit]
 Description=Rockchip RKAIQ camera 3A server
-Documentation=https://github.com/Panzhifeng-seeed/seeed_armbian_extension
 After=local-fs.target
 
 [Service]
