@@ -9,8 +9,8 @@ inherit deploy
 # BL32 v1.20 / DDR v1.21, RK3576: BL31 v1.24 / BL32 v1.08 / DDR v1.12).
 # Upstream master removes old blob versions as new ones land (the first
 # of these was dropped on 2026-01-07); moving this pin silently changes
-# the boot chain and requires on-board revalidation.  Armbian pins the
-# same way per SoC for the same reason (their rk3576 FIXME documents a
+# the boot chain and requires on-board revalidation.  The vendor build pins
+# the same way per SoC for the same reason (their rk3576 FIXME documents a
 # newer DDR regressing boot on some boards).
 SRC_URI = "git://github.com/rockchip-linux/rkbin.git;protocol=https;nobranch=1 \
            file://boot_merger"
@@ -49,8 +49,8 @@ do_deploy() {
 }
 
 do_deploy:append:recomputer-rk3576-devkit() {
-    # RK3576 blobs: DDR v1.12 + BL31 v1.24 is the combination Seeed's armbian
-    # mainline-U-Boot path uses on this board.  (The armbian vendor branch
+    # RK3576 blobs: DDR v1.12 + BL31 v1.24 is the combination Seeed's
+    # mainline-U-Boot path uses on this board.  (The vendor branch
     # deliberately stays on DDR v1.08 because v1.09 regressed on some boards;
     # v1.12 is the next good generation and ships in the pinned rkbin.)
     install -Dm0644 ${S}/bin/rk35/rk3576_bl31_v1.24.elf \

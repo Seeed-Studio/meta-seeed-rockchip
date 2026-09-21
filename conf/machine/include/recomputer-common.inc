@@ -37,9 +37,8 @@ SERIAL_CONSOLES = "1500000;ttyFIQ0"
 # file only needs the Rockchip boot chain plus the rootfs.
 KERNEL_CLASSES += " uboot-extlinux-config "
 UBOOT_EXTLINUX = "1"
-# FIQ-debugger debug UART - the same console Seeed's armbian-build
-# (SERIALCON) and the balena integration use; ttyGS0 there is the
-# USB-gadget serial, not applicable to this minimal image.
+# Debug console: the FIQ-debugger UART at the baud rate the vendor boot chain
+# brings up.  ttyGS0 is the USB gadget serial; it is not a console here.
 UBOOT_EXTLINUX_CONSOLE = "console=ttyFIQ0,1500000n8"
 # Must match the rootfs partition UUID in
 # recipes-core/images/files/seeed-rockchip-sd.wks.
