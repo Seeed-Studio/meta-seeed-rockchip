@@ -1,0 +1,46 @@
+From: Seeed Rockchip BSP
+Subject: [PATCH] pxe: expand environment macros in the FDTOVERLAYS directive
+
+cmd/pxe.c runs the APPEND directive through cli_simple_process_macros()
+in label_boot() (and again for the final bootargs), but uses the
+FDTOVERLAYS list as it was parsed.  A board that wants the overlay list to
+come from its boot environment - so that one extlinux.conf serves both the
+"no overlays" and the "apply these overlays" case without rewriting a file
+that lives on a read-only rootfs - therefore cannot express it as ${...}:
+the literal text is handed to the loader as a file name and every boot
+logs "Failed loading overlay ${fdtoverlays}".
+
+Expand the directive the same way APPEND is expanded.  An undefined
+variable expands to the empty string and the loader already skips empty
+entries, so boards that never set the variable keep applying nothing.
+
+Upstream-Status: Pending
+---
+--- a/cmd/pxe.c	2026-09-21 13:47:30.890951998 +0800
++++ b/cmd/pxe.c	2026-09-21 13:47:30.890951998 +0800
+@@ -610,13 +610,24 @@
+ #ifdef CONFIG_OF_LIBFDT_OVERLAY
+ static void label_boot_fdtoverlay(cmd_tbl_t *cmdtp, struct pxe_label *label)
+ {
+-	char *fdtoverlay = label->fdtoverlays;
++	char fdtoverlay_buf[CONFIG_SYS_CBSIZE];
++	char *fdtoverlay = fdtoverlay_buf;
+ 	struct fdt_header *working_fdt;
+ 	char *fdtoverlay_addr_env;
+ 	ulong fdtoverlay_addr;
+ 	ulong fdt_addr;
+ 	int err;
+ 
++	/*
++	 * Expand ${...} macros, exactly like label_boot() does for the APPEND
++	 * directive.  The overlay list can then come from the environment, so
++	 * an extlinux.conf carrying "FDTOVERLAYS ${fdtoverlays}" applies
++	 * whatever the variable holds and applies nothing when it is unset.
++	 * Without this the literal ${fdtoverlays} would be taken for a file
++	 * name and fail to load.
++	 */
++	cli_simple_process_macros(label->fdtoverlays, fdtoverlay_buf);
++
+ 	/* Get the main fdt and map it */
+ 	fdt_addr = simple_strtoul(env_get("fdt_addr_r"), NULL, 16);
+ 	working_fdt = map_sysmem(fdt_addr, 0);

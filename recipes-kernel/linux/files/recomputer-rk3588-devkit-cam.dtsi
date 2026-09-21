@@ -4,6 +4,26 @@
  *
  */
 
+/*
+ * Both camera seats are opt-in: the power rails, muxes, sensors and the
+ * CSI/cif/isp pipeline nodes below stay disabled, and one of the board
+ * overlays has to turn a seat on before anything appears -
+ *
+ *   recomputer-rk3588-devkit-cam0-rpi-v2.dtbo   CAM0: Raspberry Pi camera v2 (IMX219)
+ *   recomputer-rk3588-devkit-cam0-rpi-v3.dtbo   CAM0: Raspberry Pi camera v3 (IMX708)
+ *   recomputer-rk3588-devkit-cam1-rpi-v2.dtbo   CAM1: Raspberry Pi camera v2
+ *   recomputer-rk3588-devkit-cam1-rpi-v3.dtbo   CAM1: Raspberry Pi camera v3
+ *
+ * The v2 and v3 overlays of one seat are mutually exclusive (their metadata
+ * marks them `exclusive`).  The bootloader applies the overlays the
+ * fdtoverlays environment variable lists, before it starts the kernel.
+ *
+ * The board DTS re-asserts the shared &rkcif/&rkisp0 controllers (and their
+ * MMUs) after this include; with no sensor and no CSI receiver enabled they
+ * have nothing to attach to, and the seat overlays enable them alongside the
+ * rest of the pipeline.
+ */
+
 / {
 	/* Camera reset/power rails */
 	cam0_rst: cam0-rst {
@@ -68,13 +88,11 @@
 
 /* cam0: i2c3 */
 &i2c3 {
-	status = "okay";
-
+	status = "disabled";
 	pinctrl-0 = <&i2c3m1_xfer>;
 
 	imx219_0: imx219@10 {
 		status = "disabled";
-
 		
 		compatible = "sony,imx219";
 		reg = <0x10>;
@@ -90,6 +108,8 @@
 			imx219_out0: endpoint {
 				remote-endpoint = <&mipi_in_ucam0>;
 				data-lanes = <1 2>;
+				/* Only reached through the cam0-rpi-v2 overlay; the
+				 * vendor tree has no IMX219-enabled board. */
 				link-frequencies = /bits/ 64 <456000000>;
 			};
 		};
@@ -109,7 +129,7 @@
 	};
 
 	imx708_0: imx708@1a {
-		status = "okay";
+		status = "disabled";
 		compatible = "sony,imx708";
 		reg = <0x1a>;
 		clocks = <&clk_cam_24m>;
@@ -120,6 +140,7 @@
 		rockchip,camera-module-facing = "front";
 		rockchip,camera-module-name = "rpi-camera-v3";
 		rockchip,camera-module-lens-name = "default";
+		lens-focus = <&dw9817_0>;
 
 		port {
 			imx708_out0: endpoint {
@@ -131,28 +152,9 @@
 	};
 };
 
-/*
- * Both camera seats are enabled - the module can be plugged into either
- * connector freely, no DTB change needed:
- *   cam0 = i2c3 chain (imx708_0, dphy0/mipi2_csi2/rkcif_lvds2/rkisp0)
- *   cam1 = i2c6 chain (imx708_1, dphy3/mipi4_csi2/rkcif_lvds4/rkisp1)
- * An empty seat's sensor fails probe cleanly (-5 on chip-id read) and
- * rkaiq_3A_server skips its half-formed media topology - validated on
- * board with both nodes on and the module in cam1 only (the "ghost
- * camera crashes rkaiq" behavior from the Armbian-era A/B tests does
- * not reproduce with this engine version; do keep exactly-one-module
- * rule of thumb: with NO module at all the 3A service gives up via its
- * start rate limit, which is fine).  The capture node follows the seat:
- * find it with `v4l2-ctl --list-devices` (rkisp0 mainpath vs rkisp1
- * mainpath); node numbers shift with probe order.
- *
- * &i2c6 is shared with fusb302@0x22 and pcf8563@0x51 from the board DTS -
- * that coexistence is fine (I2C multi-device, distinct addresses; the same
- * layout ships enabled on Seeed Armbian with both seats verified working).
- */
 /* cam1: i2c6 */
 &i2c6 {
-	status = "okay";
+	status = "disabled";
 
 	imx219_1: imx219@10 {
 		status = "disabled";
@@ -188,7 +190,7 @@
 	};
 
 	imx708_1: imx708@1a {
-		status = "okay";
+		status = "disabled";
 		compatible = "sony,imx708";
 		reg = <0x1a>;
 		clocks = <&clk_cam_24m_1>;
@@ -214,7 +216,7 @@
 /*-----------------------------------------------------------------------*/
 
 &csi2_dphy0 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -252,7 +254,7 @@
 };
 
 &csi2_dphy3 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -292,7 +294,7 @@
 /*-----------------------------------------------------------------------*/
 
 &mipi2_csi2 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -323,7 +325,7 @@
 };
 
 &mipi4_csi2 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -356,7 +358,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif_mipi_lvds2 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		cif_mipi2_in0: endpoint {
@@ -366,7 +368,7 @@
 };
 
 &rkcif_mipi_lvds4 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		cif_mipi4_in1: endpoint {
@@ -378,7 +380,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif_mipi_lvds2_sditf {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		mipi_lvds2_sditf: endpoint {
@@ -388,7 +390,7 @@
 };
 
 &rkcif_mipi_lvds4_sditf {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		mipi_lvds4_sditf: endpoint {
@@ -400,7 +402,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkisp0_vir0 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		#address-cells = <1>;
@@ -414,7 +416,7 @@
 };
 
 &rkisp1_vir1 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		#address-cells = <1>;
@@ -430,27 +432,27 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkcif_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp0 {
-	status = "okay";
+	status = "disabled";
 };
 
 &isp0_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp1 {
-	status = "okay";
+	status = "disabled";
 };
 
 &isp1_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 /*-----------------------------------------------------------------------*/

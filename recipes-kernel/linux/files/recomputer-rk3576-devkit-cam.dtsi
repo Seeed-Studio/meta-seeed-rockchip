@@ -4,10 +4,25 @@
  *
  */
 
+/*
+ * Both camera seats are opt-in: the power rails, muxes, sensors and the
+ * CSI/cif/isp/vpss pipeline nodes below stay disabled, and one of the board
+ * overlays has to turn a seat on before anything appears -
+ *
+ *   recomputer-rk3576-devkit-cam0-rpi-v2.dtbo   CAM0: Raspberry Pi camera v2 (IMX219)
+ *   recomputer-rk3576-devkit-cam0-rpi-v3.dtbo   CAM0: Raspberry Pi camera v3 (IMX708)
+ *   recomputer-rk3576-devkit-cam1-rpi-v2.dtbo   CAM1: Raspberry Pi camera v2
+ *   recomputer-rk3576-devkit-cam1-rpi-v3.dtbo   CAM1: Raspberry Pi camera v3
+ *
+ * The v2 and v3 overlays of one seat are mutually exclusive (their metadata
+ * marks them `exclusive`).  The bootloader applies the overlays the
+ * fdtoverlays environment variable lists, before it starts the kernel.
+ */
+
 / {
 
     cam0_pwr: cam0-pwr {
-        status = "okay";
+        status = "disabled";
         compatible = "regulator-fixed";
         regulator-name = "cam0_pwr";
         regulator-min-microvolt = <3300000>;
@@ -19,7 +34,7 @@
     };
 
     cam1_pwr: cam1-pwr {
-        status = "okay";
+        status = "disabled";
         compatible = "regulator-fixed";
         regulator-name = "cam1_pwr";
         regulator-min-microvolt = <3300000>;
@@ -54,7 +69,7 @@
 	};
 
     clk_cam_24m: external-camera-clock-24m {
-        status = "okay";
+        status = "disabled";
         compatible = "fixed-clock";
         clock-frequency = <24000000>;
         clock-output-names = "clk_cam_24m";
@@ -62,7 +77,7 @@
     };
 
     clk_cam_24m_1: external-camera-clock-24m-1 {
-        status = "okay";
+        status = "disabled";
         compatible = "fixed-clock";
         clock-frequency = <24000000>;
         clock-output-names = "clk_cam_24m_1";
@@ -73,7 +88,7 @@
 
 // cam0: i2c7
 &i2c7 {
-	status = "okay";
+	status = "disabled";
 	pinctrl-0 = <&i2c7m1_xfer>;
 
     imx219_0: imx219@10 {
@@ -99,7 +114,7 @@
 
 	dw9817_0: dw9817@c {
 		compatible = "dongwoon,dw9800w";
-		status = "okay";
+		status = "disabled";
 		reg = <0x0c>;
 		VDD-supply = <&cam0_rst>;
 		power-supply = <&cam0_pwr>;
@@ -112,7 +127,7 @@
 	};
 
 	imx708_0: imx708@1a {
-		status = "okay";
+		status = "disabled";
 		compatible = "sony,imx708";
 		reg = <0x1a>;
 		clocks = <&clk_cam_24m>;
@@ -138,7 +153,7 @@
 
 // cam1: i2c2
 &i2c2 {
-	status = "okay";
+	status = "disabled";
 
     imx219_1: imx219@10 {
         status = "disabled";
@@ -164,7 +179,7 @@
  /**************raspberry pi cam v3**************/
 	dw9817_1: dw9817@c {
 		compatible = "dongwoon,dw9800w";
-		status = "okay";
+		status = "disabled";
 		reg = <0x0c>;
 		VDD-supply = <&cam1_rst>;
 		power-supply = <&cam1_pwr>;
@@ -177,7 +192,7 @@
 	};
 
 	imx708_1: imx708@1a {
-		status = "okay";
+		status = "disabled";
 		compatible = "sony,imx708";
 		reg = <0x1a>;
 		clocks = <&clk_cam_24m_1>;
@@ -204,7 +219,7 @@
 /*-----------------------------------------------------------------------*/
 
 &csi2_dcphy0 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -241,7 +256,7 @@
 };
 
 &csi2_dphy0 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -282,7 +297,7 @@
 /*-----------------------------------------------------------------------*/
 
 &mipi0_csi2 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -313,7 +328,7 @@
 };
 
 &mipi1_csi2 {
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		#address-cells = <1>;
@@ -346,7 +361,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif_mipi_lvds {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		cif_mipi_in0: endpoint {
@@ -356,7 +371,7 @@
 };
 
 &rkcif_mipi_lvds1 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		cif_mipi_in1: endpoint {
@@ -368,7 +383,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif_mipi_lvds_sditf {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		mipi_lvds_sditf: endpoint {
@@ -378,7 +393,7 @@
 };
 
 &rkcif_mipi_lvds1_sditf {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		mipi_lvds1_sditf: endpoint {
@@ -390,7 +405,7 @@
 /*-----------------------------------------------------------------------*/
 
 &rkisp_vir0 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		#address-cells = <1>;
@@ -404,7 +419,7 @@
 };
 
 &rkisp_vir1 {
-	status = "okay";
+	status = "disabled";
 
 	port {
 		#address-cells = <1>;
@@ -420,27 +435,27 @@
 /*-----------------------------------------------------------------------*/
 
 &rkcif {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkcif_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkisp_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkvpss {
-	status = "okay";
+	status = "disabled";
 };
 
 &rkvpss_mmu {
-	status = "okay";
+	status = "disabled";
 };
 
 
