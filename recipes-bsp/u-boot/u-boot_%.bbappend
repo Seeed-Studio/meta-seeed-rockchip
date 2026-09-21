@@ -15,6 +15,7 @@ SRC_URI:append = " \
     file://0007-fit-restore-optee-node.patch \
     file://0008-spi-nor-ids-carry-zbit-entries.patch \
     file://0009-nvme-scan-pci-before-probe.patch \
+    file://0013-pxe-expand-fdtoverlays-macros.patch \
 "
 SRC_URI:append:rk3588 = " \
     file://0010-rk3588-sdhci-reset.patch \
@@ -39,7 +40,7 @@ do_compile[depends] += "rockchip-rkbin:do_deploy"
 # this tree instead (see do_compile): the prebuilt (v1.04) runs UFS link
 # training before serving USB (~20 s of UIC timeouts, which makes
 # `upgrade_tool db` fail) and does not know the board NOR's ZBIT
-# ZB25LQ128 JEDEC id.  Seeed's Armbian integration compiles the plug from
+# ZB25LQ128 JEDEC id.  Seeed's integration compiles the plug from
 # source for the same reasons (RK_COMPILE_USBPLUG=yes).
 RK_USBPLUG:rk3588 = "${DEPLOY_DIR_IMAGE}/usbplug-rk3588.bin"
 RK_USBPLUG:rk3576 = "${WORKDIR}/usbplug-build/usbplug.bin"
@@ -88,7 +89,7 @@ do_compile:append:rk3588() {
 # rockchip-usbplug_defconfig + configs/rk3576-usbplug.config, then the
 # board fragment (UFS off, ZBIT NOR on) appended so its values win the
 # olddefconfig pass.  ARCH=arm covers armv8 in this U-Boot generation.
-# The -Werror strip mirrors the Seeed Armbian build: the plug sources
+# The -Werror strip mirrors the Seeed build: the plug sources
 # predate the Wrynose host GCC.  sed is naturally idempotent, and the
 # relaxation also applies to this tree's main build (harmless).
 do_compile:append:rk3576() {
@@ -144,7 +145,7 @@ do_compile:append:rk3576() {
     install -Dm0644 ${B}/rk3576_idblock.img ${B}/idbloader.img
 }
 # Assemble the SPI-NOR loader image using the same layout used by the
-# Seeed Armbian integration (identical partition map for RK3576 and
+# Seeed integration (identical partition map for RK3576 and
 # RK3588): GPT metadata plus idbloader at sector 64 and the U-Boot FIT
 # at sector 16384. Keep this as an independent deployable artifact.
 do_compile:append() {
