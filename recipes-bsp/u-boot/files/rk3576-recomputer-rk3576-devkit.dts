@@ -4,7 +4,7 @@
  * Copyright (c) 2024 Radxa Computer (Shenzhen) Co., Ltd
  * Copyright (c) 2026 Seeed Studio
  *
- * Ported from the Seeed Armbian U-Boot board file for this board onto the
+ * Ported from the Seeed U-Boot board file for this board onto the
  * Rockchip SDK 2017.09 tree. The board keeps &sdhci enabled with explicit
  * eMMC pin groups, and the volume-up ADC key uses the corrected press
  * threshold.
@@ -96,7 +96,7 @@
 
 /*
  * The board can boot its runtime from eMMC, so the controller stays enabled
- * in U-Boot (the Armbian original disables it while booting from SD + SPI-NOR
+ * in U-Boot (the original disables it while booting from SD + SPI-NOR
  * only). The SoC dtsi already carries the five reset
  * lines; add the explicit pin groups the same way the RK3588 board file
  * does - without them the eMMC pads keep whatever mux earlier boot stages
