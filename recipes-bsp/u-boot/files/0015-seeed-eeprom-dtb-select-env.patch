@@ -1,0 +1,185 @@
+From: Seeed Rockchip BSP
+Subject: [PATCH] rockchip: select the DTB at boot from the board ID EEPROM
+
+The reComputer DevKits carry an AT24C256 EEPROM on i2c4 (chip address
+0x57) that Seeed programs with a 6-byte "rk35xx" ASCII signature, a
+4-byte board code ("00A0" = reComputer RK3576 DevKit, "00B0" =
+reComputer RK3588 DevKit) and the serial number.  Early production
+boards ship the EEPROM unprogrammed (reads as 0xff), so every failure
+path has to keep booting the build-time default.
+
+Add a seeed_eeprom_detect environment script that verifies the
+signature and the board code and sets ${board_dtb}, which the extlinux
+FDT directive consumes through the macro expansion added to cmd/pxe.c.
+Each SoC common header declares its own default DTB and board code:
+an image only accepts the code of a board whose SoC matches the image,
+so a code of another SoC (or an unknown one) falls back to the default
+instead of naming a DTB the image does not carry.
+
+The detection runs exactly once per boot.  The standalone BSP boot
+flow has no other hook, so CONFIG_PREBOOT runs it there through the
+seeed_eeprom_boot wrapper.  Balena builds compile the resin
+environment into the default environment (${resin_env_file} exists),
+so the wrapper defers to the resin environment injection point instead
+(see env_resin.h): that is where extra_uEnv.txt - and with it the
+seeed_eeprom_dtb_select user switch - has already been imported, so an
+"off" there means no read, no console output and the default DTB, and
+the "on" path logs once instead of twice.
+
+The detection reads the chip at literal offsets with i2c read and
+compares against expected bytes built with mw.l/mw.w and cmp.b.  The
+setexpr address-increment pattern used by other boot scripts cannot be
+used here: this tree stores setexpr results in decimal while setexpr
+operands are parsed as hexadecimal, so a computed address does not
+round trip through an environment variable.
+
+Upstream-Status: Pending
+---
+--- /dev/null
++++ b/include/configs/seeed_eeprom_env.h
+@@ -0,0 +1,89 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Boot-time DTB selection from the Seeed board ID EEPROM.
++ *
++ * The reComputer DevKits carry an AT24C256 on i2c4 (chip address 0x57)
++ * that Seeed programs with a 6-byte "rk35xx" ASCII signature, a 4-byte
++ * board code ("00A0" = reComputer RK3576 DevKit, "00B0" = reComputer
++ * RK3588 DevKit) and the board serial number.  Early production boards
++ * ship the EEPROM unprogrammed (reads as 0xff), so every failure path
++ * keeps the build-time default ${seeed_default_dtb}, which the per-SoC
++ * common header provides.
++ *
++ * The script only accepts the board code the SoC it is compiled for
++ * declares (${seeed_eeprom_own_code}): an image carries the DTBs of its
++ * own SoC only, and a code for a different SoC - or an unknown one -
++ * falls back to the default instead of naming a DTB the image does not
++ * carry.
++ *
++ * The detection runs exactly once per boot.  CONFIG_PREBOOT runs the
++ * seeed_eeprom_boot wrapper, which detects the balena boot flow through
++ * the resin environment (${resin_env_file} only exists in balena builds)
++ * and defers to the resin environment injection point there, where
++ * extra_uEnv.txt - and with it the seeed_eeprom_dtb_select user switch -
++ * has already been imported.  Standalone BSP boots have no other hook
++ * and run the detection right away; nothing can override the switch
++ * there, so it stays at its default "on".
++ *
++ * Detection uses i2c reads at literal chip offsets and mw/cmp against
++ * the expected bytes on purpose: this tree stores setexpr results in
++ * decimal while setexpr operands are parsed as hexadecimal, so an
++ * address-increment pattern cannot round trip a computed address
++ * through an environment variable.
++ *
++ * Scratch buffers: ${fdtoverlay_addr_r} receives the bytes read from
++ * the chip; ${pxefile_addr_r} and ${scriptaddr} hold the expected
++ * values.  Everything that runs later (the distro boot file loads and
++ * the overlay application) reloads these addresses, so the script must
++ * only run before the distro boot commands start - the PREBOOT hook and
++ * the resin environment injection both do.
++ */
++#ifndef __SEEED_EEPROM_ENV_H
++#define __SEEED_EEPROM_ENV_H
++
++#define SEEED_EEPROM_DTB_SELECT_ENV \
++	"seeed_eeprom_dtb_select=on\0" \
++	/* Balena builds carry the resin environment (${resin_env_file}); \
++	 * their authoritative detection point is the resin environment \
++	 * injection, which runs after extra_uEnv.txt is imported. */ \
++	"seeed_eeprom_boot=" \
++		"if test -n \"${resin_env_file}\"; then; " \
++			"else run seeed_eeprom_detect; fi\0" \
++	"seeed_eeprom_probe=" \
++		"setenv ee_match 0; " \
++		"mw.l ${pxefile_addr_r} 0x35336b72; " \
++		"mw.w ${scriptaddr} 0x7878; " \
++		"if i2c read 0x57 0x0.2 4 ${fdtoverlay_addr_r}; then " \
++			"if cmp.b ${fdtoverlay_addr_r} ${pxefile_addr_r} 4; then " \
++				"if i2c read 0x57 0x4.2 2 ${fdtoverlay_addr_r}; then " \
++					"if cmp.b ${fdtoverlay_addr_r} ${scriptaddr} 2; then " \
++						"setenv ee_match 1; " \
++					"fi; " \
++				"fi; " \
++			"fi; " \
++		"fi\0" \
++	"seeed_eeprom_detect=" \
++		"setenv board_dtb ${seeed_default_dtb}; " \
++		"if test \"${seeed_eeprom_dtb_select}\" = \"on\"; then " \
++			"if i2c dev 4; then " \
++				"run seeed_eeprom_probe; " \
++				"if test \"${ee_match}\" = \"1\"; then " \
++					"if i2c read 0x57 0x6.2 4 ${fdtoverlay_addr_r}; then " \
++						"mw.l ${pxefile_addr_r} ${seeed_eeprom_own_code}; " \
++						"if cmp.b ${fdtoverlay_addr_r} ${pxefile_addr_r} 4; then " \
++							"echo \"EEPROM: board code accepted, DTB ${board_dtb}\"; " \
++						"else " \
++							"echo \"EEPROM: board code not for this SoC, DTB ${board_dtb}\"; " \
++						"fi; " \
++					"else " \
++						"echo \"EEPROM: board code read failed, DTB ${board_dtb}\"; " \
++					"fi; " \
++				"else " \
++					"echo \"EEPROM: signature not found, DTB ${board_dtb}\"; " \
++				"fi; " \
++			"else " \
++				"echo \"EEPROM: i2c4 unavailable, DTB ${board_dtb}\"; " \
++			"fi; " \
++		"fi\0"
++
++#endif /* __SEEED_EEPROM_ENV_H */
+--- a/include/configs/rk3576_common.h
++++ b/include/configs/rk3576_common.h
+@@ -77,5 +77,6 @@
+
+ #include <config_distro_bootcmd.h>
++#include <configs/seeed_eeprom_env.h>
+
+ #define CONFIG_EXTRA_ENV_SETTINGS \
+ 	ENV_MEM_LAYOUT_SETTINGS \
+@@ -83,5 +84,8 @@
+ 	"partitions=" PARTS_RKIMG \
+ 	ROCKCHIP_DEVICE_SETTINGS \
+ 	RKIMG_DET_BOOTDEV \
+-	BOOTENV
++	BOOTENV \
++	"seeed_default_dtb=rk3576-recomputer-rk3576-devkit.dtb\0" \
++	"seeed_eeprom_own_code=0x30413030\0" \
++	SEEED_EEPROM_DTB_SELECT_ENV
+ #endif /* !CONFIG_SPL_BUILD */
+@@ -97,5 +101,7 @@
+ #define CONFIG_USB_OHCI_NEW
+ #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	1
+
+-#define CONFIG_PREBOOT
++/* Pick the DTB from the board ID EEPROM (see seeed_eeprom_boot in
++ * seeed_eeprom_env.h: balena boots defer to the resin injection point). */
++#define CONFIG_PREBOOT "run seeed_eeprom_boot"
+ #define CONFIG_LIB_HW_RAND
+--- a/include/configs/rk3588_common.h
++++ b/include/configs/rk3588_common.h
+@@ -84,5 +84,6 @@
+
+ #include <config_distro_bootcmd.h>
++#include <configs/seeed_eeprom_env.h>
+
+ #define CONFIG_EXTRA_ENV_SETTINGS \
+ 	BOOTENV_SHARED_MTD	\
+@@ -92,5 +93,8 @@
+ 	"partitions=" PARTS_RKIMG \
+ 	ROCKCHIP_DEVICE_SETTINGS \
+ 	RKIMG_DET_BOOTDEV \
+-	BOOTENV
++	BOOTENV \
++	"seeed_default_dtb=rk3588-recomputer-rk3588-devkit.dtb\0" \
++	"seeed_eeprom_own_code=0x30423030\0" \
++	SEEED_EEPROM_DTB_SELECT_ENV
+ #endif
+@@ -105,5 +109,7 @@
+ #define CONFIG_USB_OHCI_NEW
+ #define CONFIG_SYS_USB_OHCI_MAX_ROOT_PORTS	1
+
+-#define CONFIG_PREBOOT
++/* Pick the DTB from the board ID EEPROM (see seeed_eeprom_boot in
++ * seeed_eeprom_env.h: balena boots defer to the resin injection point). */
++#define CONFIG_PREBOOT "run seeed_eeprom_boot"
+ #define CONFIG_LIB_HW_RAND

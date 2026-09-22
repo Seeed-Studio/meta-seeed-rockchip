@@ -1,0 +1,38 @@
+From: Seeed Rockchip BSP
+Subject: [PATCH] pxe: expand environment macros in the FDT directive
+
+cmd/pxe.c runs the APPEND directive (and, with the FDTOVERLAYS change,
+the overlay list) through cli_simple_process_macros(), but uses the FDT
+file name exactly as it was parsed.  A board that picks its device tree
+at boot time - e.g. from a board ID EEPROM, so that one extlinux.conf on
+a read-only rootfs serves several board variants of the same SoC -
+cannot express that as ${...}: the literal text is handed to the loader
+as a file name and the boot stops with "Skipping ... for failure
+retrieving fdt".
+
+Expand the directive the same way APPEND is expanded.
+
+Upstream-Status: Pending
+---
+--- a/cmd/pxe.c	2026-09-22 10:12:00.000000000 +0800
++++ b/cmd/pxe.c	2026-09-22 10:12:00.000000000 +0800
+@@ -825,7 +825,18 @@
+ 		char *fdtfilefree = NULL;
+
+ 		if (label->fdt) {
+-			fdtfile = label->fdt;
++			/*
++			 * Expand ${...} macros, exactly like the APPEND and
++			 * FDTOVERLAYS directives.  The FDT file name can then
++			 * come from the environment - e.g. selected at boot
++			 * time from a board ID EEPROM - so a single
++			 * extlinux.conf on a read-only rootfs serves several
++			 * board variants of the same SoC.
++			 */
++			char fdt_buf[CONFIG_SYS_CBSIZE];
++
++			cli_simple_process_macros(label->fdt, fdt_buf);
++			fdtfile = fdt_buf;
+ 		} else if (label->fdtdir) {
+ 			char *f1, *f2, *f3, *f4, *slash;
+
