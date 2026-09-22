@@ -16,6 +16,8 @@ SRC_URI:append = " \
     file://0008-spi-nor-ids-carry-zbit-entries.patch \
     file://0009-nvme-scan-pci-before-probe.patch \
     file://0013-pxe-expand-fdtoverlays-macros.patch \
+    file://0014-pxe-expand-fdt-macros.patch \
+    file://0015-seeed-eeprom-dtb-select-env.patch \
 "
 SRC_URI:append:rk3588 = " \
     file://0010-rk3588-sdhci-reset.patch \
