@@ -1,0 +1,31 @@
+[Unit]
+Description=AIC8800D80 Bluetooth HCI attach on /dev/@TTY@
+Documentation=man:hciattach(8)
+# Only meaningful on boards that wire the combo's Bluetooth UART
+# (wireless-bluetooth node in the board DTS, managed by rfkill-bt).
+ConditionPathExists=/proc/device-tree/wireless-bluetooth
+# aic8800_btlpm (its rfkill powers the BT core over SDIO) comes in via
+# modules-load.d; the attach script waits for that rfkill.
+After=systemd-modules-load.service
+# Pure ordering, no pull-in: bluetooth.service is started by udev
+# (99-systemd.rules -> bluetooth.target) once hci0 exists.  Requires= or
+# Wants= here would either start bluetoothd with no controller or risk
+# ordering loops - the failure mode the Armbian aic8800 units hit.
+Before=bluetooth.service
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+Environment=AIC8800_BT_TTY=@TTY@
+Environment=AIC8800_BT_UART_NODE=@UART_NODE@
+# The script execs hciattach in the foreground, so hciattach is the unit's
+# main process and stays "active" for the lifetime of the HCI device.  A
+# restart only reattaches the H4 line discipline: the firmware went in over
+# SDIO during combo chip init and survives.
+ExecStart=@SBINDIR@/aic8800-bt-attach
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

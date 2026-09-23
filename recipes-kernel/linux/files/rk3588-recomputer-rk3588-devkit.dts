@@ -192,7 +192,7 @@
 		uart_rts_gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default", "rts_gpio";
 		pinctrl-0 = <&uart6m1_rtsn>;
-		// pinctrl-1 = <&uart6_gpios>;
+		pinctrl-1 = <&uart6_gpios>;
 		BT,reset_gpio    = <&gpio4 RK_PC4 GPIO_ACTIVE_HIGH>;
 		BT,wake_gpio     = <&gpio4 RK_PC5 GPIO_ACTIVE_HIGH>;
 		BT,wake_host_irq = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
@@ -536,7 +536,12 @@
 
 &uart6 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&uart6m1_xfer &uart6m1_ctsn &uart6m1_rtsn>;
+	/* RTS (uart6m1_rtsn) is owned by the wireless-bluetooth node: it keeps
+	 * the pin muxed as UART6_RTSn by default and switches it to a GPIO via
+	 * the rts_gpio state when the BT driver needs it. Do not re-add
+	 * &uart6m1_rtsn here - the double claim makes rfkill-bt probe fail
+	 * with -EBUSY and leaves the BT power GPIOs unmanaged. */
+	pinctrl-0 = <&uart6m1_xfer &uart6m1_ctsn>;
 	status = "okay";
 
 };
@@ -1398,6 +1403,12 @@
 
 
 &pinctrl {
+	wireless-bluetooth {
+		uart6_gpios: uart6-gpios {
+			rockchip,pins = <1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
     fan {
 		fan_tach: fan-tach {
 			rockchip,pins = <3 RK_PB6 RK_FUNC_GPIO &pcfg_pull_up>;
