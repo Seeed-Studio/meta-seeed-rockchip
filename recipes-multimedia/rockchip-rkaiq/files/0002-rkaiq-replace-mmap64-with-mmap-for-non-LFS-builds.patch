@@ -1,0 +1,42 @@
+From: balena-seeed-rockchip integration
+Subject: [PATCH] rkaiq: replace mmap64 with mmap for non-LFS builds
+
+mmap64 is a glibc LFS compatibility symbol not declared by musl or by
+glibc headers unless _LARGEFILE64_SOURCE is defined; on aarch64 plain
+mmap is already 64-bit.  The raw-dump helpers are the only in-tree
+users built outside __ANDROID__, so switch them to mmap.
+
+Upstream-Status: Submitted [needed by any non-LFS build of the rkaiq-2025_08_11 tree]
+Signed-off-by: qian
+---
+ rkaiq/hwi/isp20/DumpRkRaw.cpp | 2 +-
+ rkaiq/hwi_c/aiq_dumpRkRaw.c   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/rkaiq/hwi/isp20/DumpRkRaw.cpp b/rkaiq/hwi/isp20/DumpRkRaw.cpp
+--- a/rkaiq/hwi/isp20/DumpRkRaw.cpp
++++ b/rkaiq/hwi/isp20/DumpRkRaw.cpp
+@@ -1223,7 +1223,7 @@
+         return XCAM_RETURN_ERROR_FILE;
+     }
+
+-    uint8_t *mmap_base = (uint8_t *)mmap64(NULL, length, PROT_READ, MAP_SHARED,
++    uint8_t *mmap_base = (uint8_t *)mmap(NULL, length, PROT_READ, MAP_SHARED,
+                                              fd, base_addr);
+     if (mmap_base == (void *)(-1)) {
+         LOGE_CAMHW_SUBM(CAPTURERAW_SUBM, "mmap() failed: %s\n", strerror(errno));
+diff --git a/rkaiq/hwi_c/aiq_dumpRkRaw.c b/rkaiq/hwi_c/aiq_dumpRkRaw.c
+--- a/rkaiq/hwi_c/aiq_dumpRkRaw.c
++++ b/rkaiq/hwi_c/aiq_dumpRkRaw.c
+@@ -1090,7 +1090,7 @@
+         return XCAM_RETURN_ERROR_FILE;
+     }
+
+-    uint8_t* mmap_base = (uint8_t*)mmap64(NULL, length, PROT_READ, MAP_SHARED, fd, base_addr);
++    uint8_t* mmap_base = (uint8_t*)mmap(NULL, length, PROT_READ, MAP_SHARED, fd, base_addr);
+     if (mmap_base == (void*)(-1)) {
+         LOGE_CAMHW_SUBM(CAPTURERAW_SUBM, "mmap() failed: %s\n", strerror(errno));
+         return XCAM_RETURN_ERROR_MEM;
+--
+2.34.1
+
