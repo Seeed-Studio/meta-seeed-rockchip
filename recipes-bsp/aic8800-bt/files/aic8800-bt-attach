@@ -1,0 +1,80 @@
+#!/bin/sh
+# Bring up the Bluetooth half of the AIC8800D80 combo as hci0.
+#
+# Hardware facts this relies on (reComputer rk3588/rk3576 devkits):
+#  - The BT core firmware is pushed over SDIO by aic8800_bsp during combo
+#    bring-up; what sits on the Bluetooth UART afterwards is a plain HCI H4
+#    controller.  Nothing is downloaded here.
+#  - Two rfkill gates must be open before the controller answers:
+#      bt_default  - rfkill-bt (built-in, CONFIG_RFKILL_RK), the BT_EN rail
+#      bluetooth   - aic8800_btlpm, powers the BT subsystem over SDIO via
+#                    aicbsp_set_subsys().  This driver build may also expose
+#                    /proc/bluetooth/sleep/btwrite, but the rfkill path is
+#                    the one that works on every build config - do not copy
+#                    the sunxi reference unit's btwrite step here.
+#  - Once hci0 registers, the stock balenaOS chain takes over (udev
+#    99-systemd.rules -> bluetooth.target -> bluetoothd with
+#    AutoEnable=true; 10-local-bt-hci-up.rules does hciconfig up).  This
+#    script never touches bluez.
+#
+# The unit names the UART via Environment=: serialN aliases in the vendor
+# SoC dtsi pin the tty number per board, and the DT node name below is only
+# cross-checked so an alias change fails loudly here instead of as an HCI
+# timeout.
+set -e
+
+: "${AIC8800_BT_TTY:?AIC8800_BT_TTY not set (unit must provide it)}"
+: "${AIC8800_BT_UART_NODE:?AIC8800_BT_UART_NODE not set (unit must provide it)}"
+BAUD=1500000
+
+# 1) Wait for the btlpm rfkill.  modules-load.d loads aic8800_btlpm before
+#    this service runs (After=systemd-modules-load.service) and the
+#    platform device + rfkill are created synchronously in module init, so
+#    this loop only guards a slow or failed modprobe.
+i=0
+while [ "$i" -lt 10 ]; do
+    for r in /sys/class/rfkill/rfkill*; do
+        [ "$(cat "$r/type" 2>/dev/null)" = "bluetooth" ] && \
+        [ "$(cat "$r/name" 2>/dev/null)" = "bluetooth" ] && break 2
+    done
+    i=$((i + 1))
+    sleep 1
+done
+
+# 2) Open both bluetooth rfkill gates (raw sysfs writes: no util-linux
+#    rfkill dependency).  aic8800_btlpm registers SW-blocked, so this is
+#    required on every boot regardless of persisted state.
+unblock_bt_rfkill() {
+    for r in /sys/class/rfkill/rfkill*; do
+        [ "$(cat "$r/type" 2>/dev/null)" = "bluetooth" ] && \
+            echo 0 > "$r/soft" 2>/dev/null || true
+    done
+}
+unblock_bt_rfkill
+
+# systemd-rfkill may restore persisted state when the btlpm entry appears;
+# re-apply after a settle so a late restore cannot re-block the controller.
+sleep 0.3
+unblock_bt_rfkill
+
+# 3) Fail fast if the tty is not the board's Bluetooth UART (DT alias
+#    drift, overlay repin): a clear unit failure beats a silent HCI timeout.
+if ! readlink -f "/sys/class/tty/${AIC8800_BT_TTY}/device" 2>/dev/null \
+        | grep -q "${AIC8800_BT_UART_NODE}"; then
+    echo "aic8800-bt: /dev/${AIC8800_BT_TTY} is not backed by ${AIC8800_BT_UART_NODE} - DT alias changed?" >&2
+    exit 1
+fi
+
+# 4) hciattach comes from the bluez5 package this recipe depends on; the
+#    check turns a broken image into an obvious error.
+command -v hciattach > /dev/null 2>&1 || {
+    echo "aic8800-bt: hciattach not installed (bluez5 missing?)" >&2
+    exit 1
+}
+
+# 5) Foreground (-n) + exec: hciattach becomes the unit's main process and
+#    holds the HCI device for as long as it lives; systemd restarts it on
+#    failure.  hci_uart auto-loads via the tty-ldisc-15 module alias.
+#    Nothing may follow this line.
+echo "aic8800-bt: attaching H4 on /dev/${AIC8800_BT_TTY} at ${BAUD} (flow, nosleep)"
+exec hciattach -n -s "$BAUD" "/dev/${AIC8800_BT_TTY}" any "$BAUD" flow nosleep

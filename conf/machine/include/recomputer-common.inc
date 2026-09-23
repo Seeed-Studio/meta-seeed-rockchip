@@ -51,6 +51,7 @@ IMAGE_INSTALL:append = " \
     kernel-devicetree \
     aic8800-firmware \
     aic8800-driver \
+    aic8800-bt \
     rockchip-mpp \
     gstreamer1.0-rockchip \
     gstreamer1.0-plugins-base \
