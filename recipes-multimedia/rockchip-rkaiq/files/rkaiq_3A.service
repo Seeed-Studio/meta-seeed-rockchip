@@ -1,0 +1,15 @@
+[Unit]
+Description=Rockchip RKAIQ camera 3A server
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rkaiq_3A_server
+# The media devices only exist once a camera overlay has been applied;
+# without one the server exits, so keep retrying until a camera seat
+# shows up.  A deliberate stop is never restarted.
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
