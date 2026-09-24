@@ -19,14 +19,15 @@ COMPATIBLE_MACHINE = "^recomputer-"
 
 # Armbian's vendor branch for all rk35xx SoCs; the same tree feeds every
 # reComputer machine.  Pinned to the branch tip verified for this switch.
-# Shared per-tree files: the fiq-debugger console fixes and the common
-# hardware config baseline; each machine appends its own DTS, cam dtsi,
-# config delta and (where needed) extra patches below.
+# Shared per-tree files: the fiq-debugger console fixes, the drm ioctl guard
+# and the common hardware config baseline; each machine appends its own DTS,
+# cam dtsi, config delta and (where needed) extra patches below.
 SRC_URI = "git://github.com/armbian/linux-rockchip.git;protocol=https;branch=rk-6.1-rkr7.2 \
     file://recomputer-hardware.cfg \
     file://0001-fiq-debugger-keep-console-on-break.patch \
     file://0002-fiq-debugger-console-thread-lost-wakeup.patch \
     file://0003-fiq-debugger-lossless-tty-wake.patch \
+    file://0005-drm-getunique-guard-against-null-master.patch \
 "
 SRCREV = "5ef479b1070b9d74dcefce859826176ce0eb5fe1"
 
