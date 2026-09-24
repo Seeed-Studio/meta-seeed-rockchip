@@ -1,0 +1,40 @@
+From: Seeed Rockchip BSP
+Subject: [PATCH] drm: guard drm_getunique() against a NULL master
+
+Only primary-node file opens get a drm_master assigned;
+drm_file_alloc() creates none and drm_open_helper() calls
+drm_master_open() for primary clients only, so a render-node fd
+carries file_priv->master == NULL by design.  Upstream never reaches
+drm_getunique() with such an fd: drm_ioctl_permit() rejects
+DRM_IOCTL_GET_UNIQUE (flags 0, not DRM_RENDER_ALLOW) for render
+clients with -EACCES.
+
+The vendor tree ships CONFIG_DRM_IGNORE_IOTCL_PERMIT=y (set in
+rockchip_linux_defconfig), which compiles the entire permission
+check out.  A render-node fd then reaches drm_getunique() and
+dereferences the NULL master:
+
+    Unable to handle kernel NULL pointer dereference at virtual address 0000000000000018
+    pc : drm_getunique+0x34/0xd8
+    Call trace: drm_getunique <- drm_ioctl_kernel <- drm_ioctl <- __arm64_sys_ioctl
+
+observed on the RK3576 DevKit when Xorg's glamor bring-up probed
+/dev/dri/renderD128 (libdrm drmGetBusid() path).  Return -EACCES
+for a NULL master, matching what the compiled-out permit check
+would have answered, instead of oopsing the caller.
+
+Upstream-Status: Inappropriate [vendor config: CONFIG_DRM_IGNORE_IOTCL_PERMIT]
+---
+--- a/drivers/gpu/drm/drm_ioctl.c	2026-09-24 17:20:18.003493974 +0800
++++ b/drivers/gpu/drm/drm_ioctl.c	2026-09-24 17:20:18.027918024 +0800
+@@ -121,6 +121,10 @@
+
+ 	mutex_lock(&dev->master_mutex);
+ 	master = file_priv->master;
++	if (!master) {
++		mutex_unlock(&dev->master_mutex);
++		return -EACCES;
++	}
+ 	if (u->unique_len >= master->unique_len) {
+ 		if (copy_to_user(u->unique, master->unique, master->unique_len)) {
+ 			mutex_unlock(&dev->master_mutex);
