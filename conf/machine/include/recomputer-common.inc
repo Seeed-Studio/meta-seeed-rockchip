@@ -52,6 +52,7 @@ IMAGE_INSTALL:append = " \
     aic8800-firmware \
     aic8800-driver \
     aic8800-bt \
+    recomputer-typec-usbdp-pm \
     rockchip-mpp \
     gstreamer1.0-rockchip \
     gstreamer1.0-plugins-base \
