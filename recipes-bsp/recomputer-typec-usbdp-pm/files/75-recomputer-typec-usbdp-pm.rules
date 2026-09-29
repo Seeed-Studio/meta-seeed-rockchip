@@ -1,0 +1,13 @@
+# reComputer RK3576: keep the Type-C dwc3 controller out of runtime suspend.
+#
+# The Type-C port's dwc3 (23000000.usb) shares the USBDP combo PHY with the
+# DP display controller.  With the vendor default runtime-PM autosuspend
+# (power/control = auto) an unplug of a DP alt-mode partner can race the xHCI
+# bus suspend and hit an asynchronous SError inside xhci_bus_suspend, which
+# panics the kernel (observed 2026-09-28 on recomputer-rk3576-devkit during
+# the balenaOS TC-CTR-22 DP hotplug test; serial log kept with the test
+# notes).  Pin the controller to always-on with a udev rule; the always-on
+# cost is negligible and mirrors what the vendor runtime already does for the
+# other dwc3 on this board (23400000.usb, power/control = on).  The rule
+# matches only the RK3576 controller address and is a no-op on other boards.
+ACTION=="add", SUBSYSTEM=="platform", KERNEL=="23000000.usb", TEST=="power/control", ATTR{power/control}="on"
