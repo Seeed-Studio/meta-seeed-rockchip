@@ -1,0 +1,57 @@
+From: Seeed Rockchip BSP
+Subject: [PATCH] media: rockchip: isp: report MIN_BUFFERS_FOR_CAPTURE
+
+The RK3588 ISP30 capture queue drops every third frame when only two
+buffers are queued by userspace (~9.5fps instead of the mode 0 nominal
+14.35fps at 4608x2592 input; reproducible with a bare V4L2 polling
+loop).  Three queued buffers sustain the full frame rate.  The ISP39
+(RK3576) does not have this limitation.
+
+GStreamer v4l2src sizes its pool from
+V4L2_CID_MIN_BUFFERS_FOR_CAPTURE; since the driver did not implement
+the control, the pool defaulted to two buffers and every GStreamer
+capture pipeline ran at ~9.5fps on this platform.
+
+Implement the control (read-only, default 3) on the rkisp ctrl
+handler and attach it to the capture video nodes, so that userspace
+pools are sized correctly.  No effect on ISP39, which already
+sustains the full frame rate with two buffers.
+
+Upstream-Status: Pending
+---
+diff --git a/drivers/media/platform/rockchip/isp/capture.c b/drivers/media/platform/rockchip/isp/capture.c
+index e7872d308fca2..1bae4b12e308e 100644
+--- a/drivers/media/platform/rockchip/isp/capture.c
++++ b/drivers/media/platform/rockchip/isp/capture.c
+@@ -1879,6 +1879,7 @@ int rkisp_register_stream_vdev(struct rkisp_stream *stream)
+ 	vdev->lock = &stream->apilock;
+ 	vdev->device_caps = V4L2_CAP_VIDEO_CAPTURE_MPLANE |
+ 				V4L2_CAP_STREAMING;
++	vdev->ctrl_handler = &dev->ctrl_handler;
+ 	video_set_drvdata(vdev, stream);
+ 	vdev->vfl_dir = VFL_DIR_RX;
+ 	node->pad.flags = MEDIA_PAD_FL_SINK;
+diff --git a/drivers/media/platform/rockchip/isp/dev.c b/drivers/media/platform/rockchip/isp/dev.c
+index 6f19ace1b033a..95bc40ef0b49e 100644
+--- a/drivers/media/platform/rockchip/isp/dev.c
++++ b/drivers/media/platform/rockchip/isp/dev.c
+@@ -989,8 +989,18 @@ static int rkisp_plat_probe(struct platform_device *pdev)
+ 	v4l2_dev = &isp_dev->v4l2_dev;
+ 	v4l2_dev->mdev = &isp_dev->media_dev;
+ 	strscpy(v4l2_dev->name, isp_dev->name, sizeof(v4l2_dev->name));
+-	v4l2_ctrl_handler_init(&isp_dev->ctrl_handler, 5);
++	v4l2_ctrl_handler_init(&isp_dev->ctrl_handler, 6);
+ 	v4l2_dev->ctrl_handler = &isp_dev->ctrl_handler;
++	/*
++	 * Report the minimum capture buffer count so userspace (GStreamer
++	 * v4l2src) sizes its pool correctly. The ISP30 drops every third
++	 * frame when only two buffers are queued (~9.5fps at 4608x2592
++	 * input); three queued buffers sustain the full frame rate.
++	 */
++	v4l2_ctrl_new_std(&isp_dev->ctrl_handler, NULL,
++			  V4L2_CID_MIN_BUFFERS_FOR_CAPTURE,
++			  1, VIDEO_MAX_FRAME, 1, 3);
++	v4l2_info(v4l2_dev, "rkisp: MIN_BUFFERS_FOR_CAPTURE=3 registered");
+ 
+ 	ret = v4l2_device_register(isp_dev->dev, &isp_dev->v4l2_dev);
+ 	if (ret < 0) {
