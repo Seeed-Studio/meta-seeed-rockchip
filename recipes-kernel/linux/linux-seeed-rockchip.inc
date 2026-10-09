@@ -58,6 +58,7 @@ SRC_URI:append:recomputer-rk3588-devkit = " \
     file://recomputer-rk3588-extra.cfg \
     file://rk3588-recomputer-rk3588-devkit.dts \
     file://recomputer-rk3588-devkit-cam.dtsi \
+    file://0006-rkisp-report-min-buffers-for-capture.patch \
 "
 SRC_URI:append:recomputer-rk3576-devkit = " \
     file://recomputer-rk3576-extra.cfg \
