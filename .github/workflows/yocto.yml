@@ -1,6 +1,11 @@
 name: Yocto image
 
 on:
+  schedule:
+    # Monthly on the 2nd at 03:00 UTC; GitHub only fires scheduled
+    # workflows from the default branch, and auto-disables them on
+    # public repos after 60 days without new commits.
+    - cron: "0 3 2 * *"
   workflow_dispatch:
     inputs:
       machine:
