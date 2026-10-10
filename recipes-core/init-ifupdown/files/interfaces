@@ -1,0 +1,19 @@
+# /etc/network/interfaces -- ifup(8)/ifdown(8) configuration for the
+# Seeed reComputer Rockchip devkits.  Recomputed from the stock template:
+# both devkits have two ethernet ports and only eth0 was marked auto.
+# udhcpc backgrounds when no carrier is present, so an unplugged port
+# never delays boot.
+
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+
+auto eth1
+iface eth1 inet dhcp
+
+# Wireless: association is handled by the wpa-supplicant ifupdown hook
+# once /etc/wpa_supplicant.conf has been provisioned; until then bring
+# wlan0 up manually for scanning.
+iface wlan0 inet dhcp

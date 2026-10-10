@@ -13,11 +13,13 @@ IMAGE_INSTALL:append = " \
     i2c-tools \
     iproute2 \
     iputils \
+    iw \
     mmc-utils \
     pciutils \
     usbutils \
     util-linux \
     v4l-utils \
+    wpa-supplicant \
 "
 
 IMAGE_LINGUAS = ""
