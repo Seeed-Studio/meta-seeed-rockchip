@@ -42,6 +42,11 @@ jobs:
       matrix:
         machine: ${{ fromJSON((github.event_name == 'workflow_dispatch' && inputs.machine != 'all') && format('["{0}"]', inputs.machine) || '["recomputer-rk3576-devkit", "recomputer-rk3588-devkit"]') }}
 
+    env:
+      # Scheduled events do not populate the inputs context; fall back to
+      # the same default as the workflow_dispatch form.
+      YOCTO_VERSION: ${{ inputs.yocto_version || 'wrynose' }}
+
     steps:
       - name: Checkout layer
         uses: actions/checkout@v5
@@ -84,7 +89,6 @@ jobs:
 
       - name: Fetch Yocto layers
         run: |
-          YOCTO_VERSION='${{ inputs.yocto_version }}'
           test "$YOCTO_VERSION" = wrynose
           checkout_revision() {
             directory="$1"
@@ -110,7 +114,7 @@ jobs:
         run: |
           ROOT_DIR="$PWD"
           export POKY_DIR="$PWD/poky"
-          source poky/oe-init-build-env build-parse-${{ inputs.yocto_version }}-${{ matrix.machine }} >/dev/null
+          source poky/oe-init-build-env "build-parse-$YOCTO_VERSION-${{ matrix.machine }}" >/dev/null
           bitbake-layers add-layer "$ROOT_DIR/meta-yocto/meta-poky"
           bitbake-layers add-layer "$ROOT_DIR/meta-openembedded/meta-oe"
           bitbake-layers add-layer "$ROOT_DIR/meta-rockchip"
@@ -122,15 +126,15 @@ jobs:
       - name: Restore Yocto sstate cache
         uses: actions/cache@v4
         with:
-          path: build-${{ inputs.yocto_version }}-${{ matrix.machine }}/sstate-cache
-          key: yocto-${{ inputs.yocto_version }}-${{ matrix.machine }}-sstate-${{ github.sha }}
+          path: build-${{ env.YOCTO_VERSION }}-${{ matrix.machine }}/sstate-cache
+          key: yocto-${{ env.YOCTO_VERSION }}-${{ matrix.machine }}-sstate-${{ github.sha }}
           restore-keys: |
-            yocto-${{ inputs.yocto_version }}-${{ matrix.machine }}-sstate-
+            yocto-${{ env.YOCTO_VERSION }}-${{ matrix.machine }}-sstate-
 
       - name: Build image
         run: |
           export POKY_DIR="$PWD/poky"
-          BUILD_DIR="build-${{ inputs.yocto_version }}-${{ matrix.machine }}"
+          BUILD_DIR="build-$YOCTO_VERSION-${{ matrix.machine }}"
           # Drop each recipe's work dir once packaged so the runner's
           # ~20 GiB of free disk survives image assembly.  The build
           # script appends to an existing conf/local.conf, so seed it
@@ -146,6 +150,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: yocto-${{ matrix.machine }}
-          path: build-${{ inputs.yocto_version }}-${{ matrix.machine }}/tmp/deploy/images/${{ matrix.machine }}/
+          path: build-${{ env.YOCTO_VERSION }}-${{ matrix.machine }}/tmp/deploy/images/${{ matrix.machine }}/
           if-no-files-found: error
           retention-days: 14
